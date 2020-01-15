@@ -1,0 +1,268 @@
+// Load the input collection and select the  EVI band.
+var MOD = ee.ImageCollection('MODIS/006/MOD13Q1').filterDate('2001-12-01','2010-12-31').select('EVI', 'DetailedQA', 'SummaryQA');
+var tmp = ee.Image("NOAA/CFSV2/FOR6H");
+
+// Load the input collection and select the  EVI band.
+var sm_msk = ee.Image("users/thomas2013/stmrsh");
+var mn_msk = ee.Image("users/thomas2013/mngrv");
+var tfwd_msk = ee.Image("users/thomas2013/tfhb");
+var tfhb_msk = ee.Image("users/thomas2013/tfwd");
+
+
+
+
+
+// this gives the percent of the given class within the pixel
+var mn_percent = mn_msk.divide(62500);
+var tfwd_percent = tfwd_msk.divide(62500);
+var sm_percent = sm_msk.divide(62500);
+var tfhb_percent = tfhb_msk.divide(62500);
+
+// filter by percentage 
+// Combine the woody classes
+
+var woody = mn_percent.add(tfwd_percent);
+//var woody_percent = woody.gt(percent);
+
+// filter by percentage 
+// Combine the herbaceous classes
+var herb = sm_percent.add(tfhb_percent);
+//var herb_percent = herb.gt(percent);
+
+
+// apply percent mask to the woody percent data (This will remove 0% pixels)
+var woody_final =  woody;
+var herb_final =  herb;
+
+
+// Map the two layers for verification
+Map.addLayer(woody_final, {Stretch: "100%"}, "Test_woody_msk" ,false,0);
+Map.addLayer(herb_final, {Stretch: "100%"}, "Test_herb_msk" ,false,0);
+
+// Map the two layers for verification
+Map.addLayer(mn_percent, {Stretch: "100%"}, "mn_msk" ,false,0);
+Map.addLayer(tfwd_percent, {Stretch: "100%"}, "tfwd_msk" ,false,0);
+Map.addLayer(sm_percent, {Stretch: "100%"}, "sm_msk" ,false,0);
+Map.addLayer(tfhb_percent, {Stretch: "100%"}, "tfhb_msk" ,false,0);
+
+
+// create precentate
+//var percent = [0.0];
+
+
+//Map.addLayer(imgs_pre,{}, names);
+var list=MOD.toList(435);//the length means that the volume of collection
+
+// A function to mask out cloudy pixels.
+var clouds = function(image) {
+  // Select the QA band.
+  var QA = image.select('SummaryQA')
+  // return a mask of only the cloudy areas
+  return image.updateMask(QA.eq(3)) // .eq should baybe .gt
+}
+
+// Create cloud mask function 
+// This grabs the date before and the date afterwards and gets the mean for the cloud mask area
+var cloud_mask = (function(msk){
+  var pre = ee.Image(list.get(i-1));
+  var post = ee.Image(list.get(i+1));
+  var preMask = pre.updateMask(msk);
+  var postMask = post.updateMask(msk);
+  var hd = preMask.add(postMask);
+  return hd.divide(2)// return the average values of the two masks
+})
+
+
+//Establish Constants
+//Woody, Herbaceous
+var Tmin = [1.0435, 0.3985];
+var Tmax = [33.68, 33.47];
+var Topt = [28.43, 27.74];
+var epsilon_max = [0.03121, 0.02103];
+var mevi = [2.987, 3.103];
+var msal = [0,0];
+var mPAR = [0.00981, -0.00192];
+
+var lis = ee.List([1]);
+var nm = ee.List([1]);
+
+var nmsk = ["Woody", "Herb"];
+
+//Select mask
+for (var ms=0; ms<2;ms++){
+  // clean the count variables between major loops
+  var nfive = 0;
+  var nine = 0;
+  var efive = 0;
+  var eight = 0;
+  var seven = 0;
+  var six = 0;
+  var five = 0;
+  var ten =0;
+  var m = 0;
+
+  // Start of percent loop
+  for (var m=0;m<1;m++){
+    //var percent = [0.00];
+    //var nmpercent = ["0%"]
+    // Load the approprate mask
+    if(ms===0){
+     print("Initializing Woody Mask")
+     var msk = woody_final;
+    }else{
+     print("Moving to Herb mask")
+      var msk = herb_final;
+    }
+            
+    // Get percent of area of pixel 
+    //var int = msk;
+    //var mn_per = int.gt(percent[m]);
+    //Map.addLayer(mn_per, {},nmsk[ms] + " mask "+percent[m]);
+
+    //print("percent selected " + percent[m])
+    //Update mask
+    //var imgs =  mn_per.updateMask(msk);
+    var imgs = msk // this is cutting out the chance that percent is messing with the code
+  
+  //Map.addLayer(imgs,{}, "TEST");
+    for (var i=1;i<10;i++){ // loop must start at 1
+        var inc=ee.Image(list.get(i));
+        var hold = inc.id(); // get name data
+        var HH = ee.Image(list.get(i+1)); // Get the next date # modis moves forward not back
+        var oH = HH.id(); // get name data
+        // the 4 lines below remove "_" and replace with a "-"
+        var tsts = oH.replace("_","-");
+        var oldHold = tsts.replace("_","-");
+        var hold = hold.replace("_","-");
+        var hold = hold.replace("_","-");
+  
+        // Internal mask loop each loop selects a different portion of the mask
+        var t = ms;
+        // Gather Weather data
+        var tmp = ee.ImageCollection("NOAA/CFSV2/FOR6H")
+              .filterDate(hold, oldHold)
+              .select("Temperature_height_above_ground","Downward_Short-Wave_Radiation_Flux_surface_6_Hour_Average");
+          // Separate out the individual bands and get the mean value of each
+        var tst = tmp.select("Downward_Short-Wave_Radiation_Flux_surface_6_Hour_Average").mean();
+        var tmpAIR = tmp.select("Temperature_height_above_ground").mean();
+        //var mn_msk = ee.Image("users/thomas2013/mngrv");
+        // Get percent of area of pixel 
+            
+         if(ms===0){
+            print("Initializing Woody Mask")
+            var msk = woody_final;
+         }else{
+            print("Initializing Herb Mask")
+            var msk = herb_final;
+         }
+            
+        //var int = msk;
+        // the lower lines are commented out to remove percent from considereation
+        //var mn_per = int.gt(percent[m]);
+        //Update mask
+        var imgs = msk; // originally mn_per.updateMask(msk)
+          
+        // apply cloud masks
+        var cm =  clouds(inc);// find clouds in image
+        var clean = cloud_mask(cm);// average out clouds
+        var names = ee.String(hold)
+             .getInfo();
+        // Apply coastal masks
+        var comb1 = inc.updateMask(imgs); // clip to marsh
+        var comb = comb1.unmask(clean);
+        var combf = comb.updateMask(imgs);
+        var tmpAIR = tmpAIR.updateMask(imgs);
+        // Establish Constants 
+        var IP2 = tst.multiply(0.45);
+        var incidentPAR = IP2.multiply(4.57*86400*0.000001);
+        var Ta = tmpAIR.subtract(273.15); // convert temp to C
+                  
+        // This is the Fta equation below because basic math in Google Earth Engine sucks
+        var taMin = Ta.subtract(Tmin[t]);
+        var taMax = Ta.subtract(Tmax[t]);
+        var numer = taMin.multiply(taMax);
+        var partbottom = (Ta.subtract(Topt[t]));
+        var sqpart = partbottom.pow(2);
+        var Fta = numer.divide(numer.subtract(sqpart));
+        // Main Equation Section 
+    //----------------------------------------------------------------------------------------------
+      // missing zero exception
+        var Fsal = 1;
+        // missing zero exception
+        var Fsaturation = incidentPAR.expression(
+            "1-(inc*(m))",{
+            "m" : mPAR[t],
+            "inc" : incidentPAR,
+        });
+    
+        // missing zero exception
+        // This gives us our "Daily" base value to be applied to fPAR
+        var one = epsilon_max[t];
+        var epsilon = ((Fta.multiply((Fsaturation))));
+        var epsilon = epsilon.multiply(one);
+        var daily = (epsilon.multiply(incidentPAR));
+
+        //fPAR equation
+        var fPAR1 = combf.expression(
+          "(-mevi*importedraster*0.0001)",{
+          "mevi": mevi[t],
+          "importedraster": combf.select("EVI"),
+        });
+        var expo = fPAR1.exp();
+        var fPAR = expo.expression(
+          "(1-ex)",{
+          "ex": expo,
+        });
+                
+    //----------------------------------------------------------------------------------------
+        // Get final Dialy_GPP
+               
+        var d1 = daily.multiply(fPAR);
+        var daily_GPP2 = d1.select(["Temperature_height_above_ground"],["GPP"]);
+        var daily_GPP = daily_GPP2.where(daily_GPP2.select("GPP").lt(0),0);// replace values less than 0 with 0 
+                 
+        var reprojected = daily_GPP.select("GPP").reproject('EPSG:32614', null, 250);
+        //This exports each masked GPP value to Google Drive under the Foo folder.
+        Export.image.toDrive({
+          image: reprojected,
+          description: nmsk[ms] + '_' + names, // this is the name of the file
+          folder: "Foo",
+          maxPixels: 1e13,
+          scale: 250,
+          region:msk.geometry(), 
+        });
+      //var percentnm = (names, nmpercent[m]);
+      }
+      
+    }
+//print("All count " + nmsk[ms])
+//var reduce = daily_GPP.reduceRegion({
+//  reducer: ee.Reducer.count(),
+//  geometry: msk.geometry(),
+//  scale: 250,
+//  maxPixels: 1e12
+  //bestEffort: true,
+  //tileScale: 16
+//});
+
+//print(reduce)
+
+//.unitScale(-2000, 10000)
+
+Export.image.toDrive({
+  image: msk,
+  description: 'maskExport_nopercent' + nmsk[ms] +'_'+ names,
+  folder: "Foo",
+  maxPixels: 1e13,
+  scale: 250,
+  region:msk.geometry(), 
+  });
+
+}
+
+//print(tendat)
+
+
+
+
+
