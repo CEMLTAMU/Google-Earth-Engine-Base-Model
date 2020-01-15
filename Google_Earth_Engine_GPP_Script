@@ -235,19 +235,7 @@ for (var ms=0; ms<2;ms++){
       }
       
     }
-//print("All count " + nmsk[ms])
-//var reduce = daily_GPP.reduceRegion({
-//  reducer: ee.Reducer.count(),
-//  geometry: msk.geometry(),
-//  scale: 250,
-//  maxPixels: 1e12
-  //bestEffort: true,
-  //tileScale: 16
-//});
 
-//print(reduce)
-
-//.unitScale(-2000, 10000)
 
 Export.image.toDrive({
   image: msk,
@@ -260,7 +248,7 @@ Export.image.toDrive({
 
 }
 
-//print(tendat)
+
 
 
 
